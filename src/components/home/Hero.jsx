@@ -30,7 +30,7 @@ export default function Hero({ onGetStarted }) {
           </div>
         </div>
 
-        <Card className="shadow-lg">
+        <Card className="shadow-lg animate-float">
           <p className="text-sm font-semibold text-slate-700 mb-4">
             Available Components
           </p>
@@ -47,7 +47,7 @@ export default function Hero({ onGetStarted }) {
                 </div>
                 <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                   <div
-                    className="h-2 bg-primary-500 rounded-full"
+                    className="h-2 bg-primary-500 rounded-full transition-all duration-500"
                     style={{ width: `${(item.available / 15) * 100}%` }}
                   />
                 </div>

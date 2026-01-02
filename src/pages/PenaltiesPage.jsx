@@ -1,38 +1,73 @@
+// src/pages/PenaltiesPage.jsx
+import { useState, useEffect } from "react";
 import AuthenticatedLayout from "../components/layout/AuthenticatedLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import Badge from "../components/common/Badge.jsx";
 import Button from "../components/common/Button.jsx";
+import { penaltiesAPI } from "../api/penalties";
+
+const MOCK_OVERVIEW = {
+  total: "৳450",
+  paid: "৳200",
+  pending: "৳250",
+};
+
+const MOCK_HISTORY = [
+  {
+    id: 1,
+    type: "Late return penalty",
+    component: "Arduino Uno · BOOK-001",
+    info: "Overdue: 5 days · Date: Dec 20, 2025",
+    status: "Pending",
+    amount: "৳250",
+  },
+  {
+    id: 2,
+    type: "Damage penalty",
+    component: "Ultrasonic Sensor · BOOK-005",
+    info: "Broken connector · Date: Dec 10, 2025",
+    status: "Paid",
+    amount: "৳200",
+  },
+];
+
+const PENALTY_RULES = [
+  { label: "Late return", value: "৳50 per day per item" },
+  { label: "Minor damage", value: "৳200 – ৳500" },
+  { label: "Major damage", value: "৳500 – ৳2000" },
+  { label: "Lost item", value: "Full replacement cost" },
+];
 
 export default function PenaltiesPage() {
-  const overview = {
-    total: "৳450",
-    paid: "৳200",
-    pending: "৳250",
-  };
+  const [overview, setOverview] = useState(MOCK_OVERVIEW);
+  const [history, setHistory] = useState(MOCK_HISTORY);
+  const [loading, setLoading] = useState(true);
 
-  const history = [
-    {
-      type: "Late return penalty",
-      component: "Arduino Uno · BOOK-001",
-      info: "Overdue: 5 days · Date: Dec 20, 2025",
-      status: "Pending",
-      amount: "৳250",
-    },
-    {
-      type: "Damage penalty",
-      component: "Ultrasonic Sensor · BOOK-005",
-      info: "Broken connector · Date: Dec 10, 2025",
-      status: "Paid",
-      amount: "৳200",
-    },
-  ];
+  // Load penalties via API
+  useEffect(() => {
+    penaltiesAPI
+      .getPenalties()
+      .then(() => {
+        // When backend is ready, replace with res.data
+        setOverview(MOCK_OVERVIEW);
+        setHistory(MOCK_HISTORY);
+        setLoading(false);
+      })
+      .catch(() => {
+        // On error, show mock data
+        setOverview(MOCK_OVERVIEW);
+        setHistory(MOCK_HISTORY);
+        setLoading(false);
+      });
+  }, []);
 
-  const rules = [
-    { label: "Late return", value: "৳50 per day per item" },
-    { label: "Minor damage", value: "৳200 – ৳500" },
-    { label: "Major damage", value: "৳500 – ৳2000" },
-    { label: "Lost item", value: "Full replacement cost" },
-  ];
+  if (loading) {
+    return (
+      <AuthenticatedLayout title="Penalties">
+        <p className="text-sm text-slate-600">Loading penalties…</p>
+      </AuthenticatedLayout>
+    );
+  }
 
   return (
     <AuthenticatedLayout title="Penalties">
@@ -76,9 +111,9 @@ export default function PenaltiesPage() {
               Penalty history
             </h2>
             <div className="space-y-3 text-sm">
-              {history.map((p, i) => (
+              {history.map((p) => (
                 <div
-                  key={i}
+                  key={p.id}
                   className="border border-slate-200 rounded-lg p-3 bg-slate-50"
                 >
                   <div className="flex justify-between items-center mb-1">
@@ -102,6 +137,11 @@ export default function PenaltiesPage() {
                   </div>
                 </div>
               ))}
+              {history.length === 0 && (
+                <p className="text-sm text-slate-500 text-center py-4">
+                  No penalties recorded.
+                </p>
+              )}
             </div>
           </Card>
         </div>
@@ -124,7 +164,16 @@ export default function PenaltiesPage() {
                 <li>Nagad: 01XXXXXXXXXX</li>
               </ul>
             </div>
-            <Button className="w-full">Mark as paid</Button>
+            <Button
+              className="w-full"
+              onClick={() =>
+                penaltiesAPI.markPaid("all").catch(() => {
+                  console.log("Mark paid clicked");
+                })
+              }
+            >
+              Mark as paid
+            </Button>
             <p className="mt-2 text-[11px] text-slate-500 text-center">
               Upload receipt to lab admin for verification.
             </p>
@@ -135,7 +184,7 @@ export default function PenaltiesPage() {
               Penalty rules
             </h3>
             <div className="space-y-2 text-xs">
-              {rules.map((r) => (
+              {PENALTY_RULES.map((r) => (
                 <div key={r.label}>
                   <div className="font-semibold text-slate-800">{r.label}</div>
                   <div className="text-slate-600">{r.value}</div>

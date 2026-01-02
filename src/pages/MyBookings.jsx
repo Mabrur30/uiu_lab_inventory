@@ -1,10 +1,12 @@
-import { useState } from "react";
+// src/pages/MyBookings.jsx
+import { useState, useEffect } from "react";
 import AuthenticatedLayout from "../components/layout/AuthenticatedLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import Badge from "../components/common/Badge.jsx";
 import Button from "../components/common/Button.jsx";
+import { bookingsAPI } from "../api/bookings";
 
-const ALL_BOOKINGS = [
+const MOCK_BOOKINGS = [
   {
     id: "BOOK-001",
     component: "Arduino Uno",
@@ -55,8 +57,38 @@ function badgeVariant(status) {
 
 export default function MyBookings() {
   const [filter, setFilter] = useState("All");
+  const [bookings, setBookings] = useState(MOCK_BOOKINGS);
+  const [loading, setLoading] = useState(true);
 
-  const bookings = ALL_BOOKINGS.filter((b) => statusMatchesFilter(b, filter));
+  // Load bookings via API
+  useEffect(() => {
+    const filterParam = filter === "All" ? "all" : filter.toLowerCase();
+
+    bookingsAPI
+      .getBookings(filterParam)
+      .then(() => {
+        // When backend is ready, replace with res.data
+        setBookings(
+          MOCK_BOOKINGS.filter((b) => statusMatchesFilter(b, filter))
+        );
+        setLoading(false);
+      })
+      .catch(() => {
+        // On error, show mock data
+        setBookings(
+          MOCK_BOOKINGS.filter((b) => statusMatchesFilter(b, filter))
+        );
+        setLoading(false);
+      });
+  }, [filter]);
+
+  if (loading) {
+    return (
+      <AuthenticatedLayout title="My bookings">
+        <p className="text-sm text-slate-600">Loading bookings…</p>
+      </AuthenticatedLayout>
+    );
+  }
 
   return (
     <AuthenticatedLayout title="My bookings">

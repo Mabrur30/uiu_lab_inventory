@@ -5,7 +5,7 @@ import Features from "../components/home/Features.jsx";
 import Stats from "../components/home/Stats.jsx";
 import CTA from "../components/home/CTA.jsx";
 import LoginModal from "../components/auth/LoginModal.jsx";
-import Footer from "../components/common/Footer.jsx"; // ← add this
+import Footer from "../components/common/Footer.jsx";
 
 export default function HomePage() {
   const [loginOpen, setLoginOpen] = useState(false);

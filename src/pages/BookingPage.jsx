@@ -1,29 +1,31 @@
-import { useState } from "react";
+// src/pages/BookingPage.jsx
+import { useState, useEffect } from "react";
 import AuthenticatedLayout from "../components/layout/AuthenticatedLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import Button from "../components/common/Button.jsx";
+import { bookingsAPI } from "../api/bookings";
 
-const COMPONENTS = [
+const MOCK_COMPONENTS = [
   {
     id: 1,
-    name: "Arduino Uno",
-    available: 8,
-    location: "Lab A · Shelf 1",
-    category: "Microcontroller",
+    name: "3.2 inch TFT LCD Display Module",
+    code: "COMP-001",
+    available: 2,
+    image: "https://via.placeholder.com/400x300.png?text=3.2+TFT+LCD",
   },
   {
     id: 2,
-    name: "ESP32 Dev Kit",
+    name: "Serial Port RS232 to TTL Converter",
+    code: "COMP-002",
     available: 5,
-    location: "Lab A · Shelf 2",
-    category: "Microcontroller",
+    image: "https://via.placeholder.com/400x300.png?text=RS232+TTL",
   },
   {
     id: 3,
-    name: "Raspberry Pi 4",
+    name: "ESC40A Brushless Motor ESC",
+    code: "COMP-003",
     available: 3,
-    location: "Lab B · Cabinet 1",
-    category: "SBC",
+    image: "https://via.placeholder.com/400x300.png?text=ESC+40A",
   },
 ];
 
@@ -36,8 +38,29 @@ export default function BookingPage() {
   const [details, setDetails] = useState("");
   const [message, setMessage] = useState("");
 
-  const filtered = COMPONENTS.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+  // API state
+  const [components, setComponents] = useState(MOCK_COMPONENTS);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsItem, setDetailsItem] = useState(null);
+
+  // Load components via API
+  useEffect(() => {
+    bookingsAPI
+      .getComponents()
+      .then(() => {
+        // When backend is ready, replace with res.data
+        setComponents(MOCK_COMPONENTS);
+      })
+      .catch(() => {
+        // On error, show mock data
+        setComponents(MOCK_COMPONENTS);
+      });
+  }, []);
+
+  const filtered = components.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.code.toLowerCase().includes(search.toLowerCase())
   );
 
   const submit = (e) => {
@@ -50,72 +73,127 @@ export default function BookingPage() {
       setMessage("Quantity invalid for available stock / max 5 per student.");
       return;
     }
-    // later: send to backend
-    setMessage("Booking request submitted (mock).");
+
+    // Send to API (mock for now)
+    bookingsAPI.createBooking({
+      componentId: selected.id,
+      quantity: qty,
+      expectedReturn,
+      course,
+      details,
+    });
+
+    setMessage("Booking request submitted successfully.");
+    // Reset form
+    setTimeout(() => {
+      setSelected(null);
+      setQty(1);
+      setExpectedReturn("");
+      setCourse("");
+      setDetails("");
+      setMessage("");
+    }, 2000);
   };
 
   return (
     <AuthenticatedLayout title="New Booking">
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: list/search */}
-        <Card className="lg:col-span-2">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">
-            New booking
-          </h2>
-          <p className="text-sm text-slate-600 mb-4">
-            Request a component from the hardware lab for your lab or project
-            work.
-          </p>
+        {/* Left: product grid like shop UI */}
+        <div className="lg:col-span-2 space-y-4">
+          <Card>
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">
+              New booking
+            </h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Browse components and select one to create a booking request.
+            </p>
 
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Search component
-            </label>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or code (e.g. Arduino, COMP001)"
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
-            />
-          </div>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Search component
+              </label>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or code (e.g. Arduino, COMP001)"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
+              />
+            </div>
 
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {filtered.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  setSelected(c);
-                  setQty(1);
-                  setMessage("");
-                }}
-                className={`w-full text-left border rounded-md px-3 py-2 text-sm ${
-                  selected?.id === c.id
-                    ? "border-primary-500 bg-primary-50"
-                    : "border-slate-200 hover:border-primary-300"
-                }`}
-              >
-                <div className="flex justify-between">
-                  <div>
-                    <div className="font-semibold text-slate-900">{c.name}</div>
-                    <div className="text-xs text-slate-500">{c.category}</div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((c) => (
+                <div
+                  key={c.id}
+                  className={`border rounded-lg overflow-hidden bg-white flex flex-col ${
+                    selected?.id === c.id
+                      ? "border-primary-500 shadow-md"
+                      : "border-slate-200 hover:shadow-sm"
+                  }`}
+                >
+                  {/* image */}
+                  <div className="aspect-[4/3] bg-slate-100">
+                    <img
+                      src={c.image}
+                      alt={c.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  <div className="text-right text-xs">
-                    <div className="font-semibold text-primary-600">
-                      {c.available} available
+
+                  {/* content */}
+                  <div className="p-3 flex-1 flex flex-col">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-1 line-clamp-2">
+                      {c.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mb-2">
+                      Code: {c.code}
+                    </p>
+
+                    <div className="mt-auto space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600">
+                          Availability:{" "}
+                          <span className="font-semibold text-primary-600">
+                            {c.available}
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDetailsItem(c);
+                            setDetailsOpen(true);
+                          }}
+                          className="flex-1 text-xs font-semibold border border-slate-300 text-slate-700 rounded-full py-1.5 hover:bg-slate-50"
+                        >
+                          View details
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelected(c);
+                            setQty(1);
+                            setMessage("");
+                          }}
+                          className="flex-1 text-xs font-semibold border border-primary-500 text-white bg-primary-500 rounded-full py-1.5 hover:bg-primary-600"
+                        >
+                          Select
+                        </button>
+                      </div>
                     </div>
-                    <div className="text-slate-500">{c.location}</div>
                   </div>
                 </div>
-              </button>
-            ))}
-            {filtered.length === 0 && (
-              <div className="text-sm text-slate-500 py-4">
-                No components match your search.
-              </div>
-            )}
-          </div>
-        </Card>
+              ))}
+
+              {filtered.length === 0 && (
+                <p className="text-sm text-slate-500 col-span-full">
+                  No components match your search.
+                </p>
+              )}
+            </div>
+          </Card>
+        </div>
 
         {/* Right: form */}
         <Card>
@@ -185,7 +263,13 @@ export default function BookingPage() {
             </div>
 
             {message && (
-              <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              <div
+                className={`text-xs rounded-md px-3 py-2 ${
+                  message.includes("successfully")
+                    ? "text-green-600 bg-green-50 border border-green-200"
+                    : "text-red-600 bg-red-50 border border-red-200"
+                }`}
+              >
                 {message}
               </div>
             )}
@@ -200,6 +284,64 @@ export default function BookingPage() {
             </Button>
           </form>
         </Card>
+
+        {/* Details modal */}
+        {detailsOpen && detailsItem && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 overflow-hidden">
+              <div className="flex justify-between items-center px-5 py-3 border-b border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {detailsItem.name}
+                </h3>
+                <button
+                  onClick={() => setDetailsOpen(false)}
+                  className="text-slate-500 text-lg leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5 grid md:grid-cols-2 gap-4">
+                <div className="bg-slate-100 rounded-md overflow-hidden">
+                  <img
+                    src={detailsItem.image}
+                    alt={detailsItem.name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="text-sm space-y-3">
+                  <p className="text-slate-600">
+                    Detailed information about this component will be shown here
+                    later (datasheet link, specs, lab location, etc.).
+                  </p>
+                  <div>
+                    <div className="text-xs text-slate-500">Code</div>
+                    <div className="font-medium text-slate-900">
+                      {detailsItem.code}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Availability</div>
+                    <div className="font-medium text-slate-900">
+                      {detailsItem.available} in stock
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelected(detailsItem);
+                      setQty(1);
+                      setDetailsOpen(false);
+                    }}
+                    className="mt-2 w-full px-4 py-2 rounded-full bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600"
+                  >
+                    Select for booking
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AuthenticatedLayout>
   );

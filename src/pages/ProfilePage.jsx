@@ -1,32 +1,74 @@
-import { useState } from "react";
+// src/pages/ProfilePage.jsx
+import { useState, useEffect } from "react";
 import AuthenticatedLayout from "../components/layout/AuthenticatedLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import Button from "../components/common/Button.jsx";
+import { profileAPI } from "../api/profile";
+
+const DEFAULT_PROFILE = {
+  name: "Tamvir Hossan",
+  studentId: "01122xxxx",
+  department: "Computer Science & Engineering",
+  email: "tamvir@student.uiu.ac.bd",
+  phone: "+880 1712-345678",
+  batch: "Fall 2022",
+  memberSince: "October 15, 2023",
+};
+
+const ACCOUNT_STATS = [
+  { label: "Total bookings", value: 15 },
+  { label: "Active bookings", value: 2 },
+  { label: "Completed", value: 12 },
+  { label: "Overdue instances", value: 1 },
+];
 
 export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    name: "Tamvir Hossan",
-    studentId: "01122xxxx",
-    department: "Computer Science & Engineering",
-    email: "tamvir@student.uiu.ac.bd",
-    phone: "+880 1712-345678",
-    batch: "Fall 2022",
-    memberSince: "October 15, 2023",
+  const [form, setForm] = useState(DEFAULT_PROFILE);
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState({
+    bookingUpdates: true,
+    returnReminders: true,
+    penaltyNotifications: false,
   });
+  const [contactMethod, setContactMethod] = useState("Email");
 
-  const stats = [
-    { label: "Total bookings", value: 15 },
-    { label: "Active bookings", value: 2 },
-    { label: "Completed", value: 12 },
-    { label: "Overdue instances", value: 1 },
-  ];
+  // Load profile via API
+  useEffect(() => {
+    profileAPI
+      .getProfile()
+      .then(() => {
+        // When backend is ready, replace with res.data
+        setForm(DEFAULT_PROFILE);
+        setLoading(false);
+      })
+      .catch(() => {
+        // On error, show mock data
+        setForm(DEFAULT_PROFILE);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <AuthenticatedLayout title="Profile">
+        <p className="text-sm text-slate-600">Loading profile…</p>
+      </AuthenticatedLayout>
+    );
+  }
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const onSave = (e) => {
     e.preventDefault();
+    profileAPI.updateProfile(form);
     setEditing(false);
+  };
+
+  const handleNotificationChange = (key) => {
+    const updated = { ...notifications, [key]: !notifications[key] };
+    setNotifications(updated);
+    profileAPI.updateNotifications(updated);
   };
 
   return (
@@ -56,7 +98,7 @@ export default function ProfilePage() {
               Account statistics
             </h3>
             <div className="space-y-2 text-xs">
-              {stats.map((s) => (
+              {ACCOUNT_STATS.map((s) => (
                 <div
                   key={s.label}
                   className="flex items-center justify-between"
@@ -200,15 +242,33 @@ export default function ProfilePage() {
                 </span>
                 <div className="mt-2 space-y-1 text-xs">
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" defaultChecked />
+                    <input
+                      type="checkbox"
+                      checked={notifications.bookingUpdates}
+                      onChange={() =>
+                        handleNotificationChange("bookingUpdates")
+                      }
+                    />
                     <span>Booking status updates</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" defaultChecked />
+                    <input
+                      type="checkbox"
+                      checked={notifications.returnReminders}
+                      onChange={() =>
+                        handleNotificationChange("returnReminders")
+                      }
+                    />
                     <span>Return reminders</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" />
+                    <input
+                      type="checkbox"
+                      checked={notifications.penaltyNotifications}
+                      onChange={() =>
+                        handleNotificationChange("penaltyNotifications")
+                      }
+                    />
                     <span>Penalty notifications</span>
                   </label>
                 </div>
@@ -218,7 +278,11 @@ export default function ProfilePage() {
                 <label className="block text-xs text-slate-600 mb-1">
                   Preferred contact method
                 </label>
-                <select className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500">
+                <select
+                  value={contactMethod}
+                  onChange={(e) => setContactMethod(e.target.value)}
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
+                >
                   <option>Email</option>
                   <option>Phone</option>
                   <option>SMS</option>

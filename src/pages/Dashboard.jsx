@@ -1,36 +1,83 @@
+// src/pages/Dashboard.jsx
+import { useState, useEffect } from "react";
 import AuthenticatedLayout from "../components/layout/AuthenticatedLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import Badge from "../components/common/Badge.jsx";
 import Button from "../components/common/Button.jsx";
+import { dashboardAPI } from "../api/dashboard";
 
 export default function Dashboard() {
-  const stats = [
-    { label: "Active bookings", value: 2, note: "Items currently checked out" },
-    { label: "Overdue items", value: 0, note: "Return items before due date" },
-    {
-      label: "Total penalties",
-      value: "৳0",
-      note: "Calculated from lab rules",
-    },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [stats, setStats] = useState([]);
+  const [upcoming, setUpcoming] = useState([]);
 
-  const upcoming = [
-    {
-      component: "Arduino Uno",
-      qty: 1,
-      dueDate: "2026-01-03",
-      status: "Approved",
-    },
-    {
-      component: "ESP32 Dev Kit",
-      qty: 1,
-      dueDate: "2025-12-30",
-      status: "Requested",
-    },
-  ];
+  useEffect(() => {
+    dashboardAPI
+      .getStats()
+      .then(() => {
+        // MOCK DATA for now
+        const mockStats = [
+          {
+            label: "Active bookings",
+            value: 2,
+            note: "Items currently checked out or approved for you.",
+          },
+          {
+            label: "Overdue items",
+            value: 0,
+            note: "Please return items before the due date to avoid penalties.",
+          },
+          {
+            label: "Total penalties",
+            value: "৳0",
+            note: "Penalties are calculated based on lab rules and overdue days.",
+          },
+        ];
 
+        const mockUpcoming = [
+          {
+            component: "Arduino Uno",
+            qty: 1,
+            dueDate: "2026-01-03",
+            status: "Approved",
+          },
+          {
+            component: "ESP32 Dev Kit",
+            qty: 1,
+            dueDate: "2025-12-30",
+            status: "Requested",
+          },
+        ];
+
+        setStats(mockStats);
+        setUpcoming(mockUpcoming);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Could not load dashboard data. Showing sample data.");
+        setLoading(false);
+      });
+  }, []);
+
+  // 3.3 – loading state (goes BEFORE the normal return)
+  if (loading) {
+    return (
+      <AuthenticatedLayout title="Dashboard">
+        <p className="text-sm text-slate-600">Loading dashboard…</p>
+      </AuthenticatedLayout>
+    );
+  }
+
+  // 3.4 – main JSX (add error banner at the top)
   return (
     <AuthenticatedLayout title="Dashboard">
+      {error && (
+        <div className="mb-4 text-xs text-yellow-900 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">
+          {error}
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid gap-4 md:grid-cols-3 mb-6">
         {stats.map((s) => (
