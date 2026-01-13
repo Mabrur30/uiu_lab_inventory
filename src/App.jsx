@@ -5,7 +5,15 @@ import BookingPage from "./pages/BookingPage.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
 import PenaltiesPage from "./pages/PenaltiesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
-
+import AdminDashboard from "./pages/AdminDashboard.jsx";
+import BookingRequests from "./pages/admin/BookingRequests.jsx";
+import StockManagement from "./pages/admin/StockManagement.jsx";
+import PenaltyManagement from "./pages/admin/PenaltyManagement.jsx";
+import StudentManagement from "./pages/admin/StudentManagement.jsx";
+import BookingHistory from "./pages/admin/BookingHistory.jsx";
+import Components from "./pages/admin/Components.jsx";
+import AddComponent from "./pages/admin/AddComponent.jsx";
+import Analytics from "./pages/admin/Analytics.jsx";
 export default function App() {
   return (
     <Router>
@@ -17,6 +25,15 @@ export default function App() {
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/penalties" element={<PenaltiesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/bookings" element={<BookingRequests />} />
+        <Route path="/admin/stock" element={<StockManagement />} />
+        <Route path="/admin/penalties" element={<PenaltyManagement />} />
+        <Route path="/admin/students" element={<StudentManagement />} />
+        <Route path="/admin/history" element={<BookingHistory />} />
+        <Route path="/admin/components" element={<Components />} />
+        <Route path="/admin/add-component" element={<AddComponent />} />
+        <Route path="/admin/analytics" element={<Analytics />} />
       </Routes>
     </Router>
   );

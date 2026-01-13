@@ -65,6 +65,7 @@ export default function BookingPage() {
 
   const submit = (e) => {
     e.preventDefault();
+
     if (!selected || !expectedReturn || !course) {
       setMessage("Please select a component, return date and course/purpose.");
       return;
@@ -74,25 +75,48 @@ export default function BookingPage() {
       return;
     }
 
-    // Send to API (mock for now)
-    bookingsAPI.createBooking({
+    // Build payload
+    const payload = {
       componentId: selected.id,
       quantity: qty,
       expectedReturn,
       course,
       details,
-    });
+    };
 
-    setMessage("Booking request submitted successfully.");
-    // Reset form
+    // 1) Log what you are sending
+    console.log("Booking payload about to send:", payload);
+
+    // 2) For now: do NOT call the fake backend, just simulate
     setTimeout(() => {
+      console.log("Pretend backend accepted booking.");
+      setMessage("Booking request submitted successfully (mock).");
       setSelected(null);
       setQty(1);
       setExpectedReturn("");
       setCourse("");
       setDetails("");
-      setMessage("");
-    }, 2000);
+    }, 500);
+
+    // If you want to really call backend later, uncomment this and
+    // remove the setTimeout above, but you must set a real baseURL.
+    /*
+  bookingsAPI
+    .createBooking(payload)
+    .then((res) => {
+      console.log("Booking API success, response data:", res.data);
+      setMessage("Booking request submitted successfully.");
+      setSelected(null);
+      setQty(1);
+      setExpectedReturn("");
+      setCourse("");
+      setDetails("");
+    })
+    .catch((err) => {
+      console.log("Booking API error:", err.response || err);
+      setMessage("Failed to submit booking. Check console for details.");
+    });
+  */
   };
 
   return (

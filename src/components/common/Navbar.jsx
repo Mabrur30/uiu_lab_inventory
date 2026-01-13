@@ -39,7 +39,7 @@ export default function Navbar({ onLoginClick }) {
 
         {/* Login */}
         <Button size="sm" variant="secondary" onClick={onLoginClick}>
-          Student Login
+          Login
         </Button>
       </div>
     </nav>
