@@ -5,6 +5,7 @@ import Card from "../components/common/Card.jsx";
 import Badge from "../components/common/Badge.jsx";
 import Button from "../components/common/Button.jsx";
 import { dashboardAPI } from "../api/dashboard";
+import { bookingsAPI } from "../api/bookings";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -13,49 +14,46 @@ export default function Dashboard() {
   const [upcoming, setUpcoming] = useState([]);
 
   useEffect(() => {
-    dashboardAPI
-      .getStats()
-      .then(() => {
-        // MOCK DATA for now
-        const mockStats = [
+    Promise.all([dashboardAPI.getUserStats(), bookingsAPI.getMyBookings()])
+      .then(([statsRes, bookingsRes]) => {
+        // Transform stats data
+        const statsData = statsRes.data || {};
+        setStats([
           {
-            label: "Active bookings",
-            value: 2,
-            note: "Items currently checked out or approved for you.",
+            label: "Active Bookings",
+            value: statsData.activeBookings || 0,
+            note: "Currently borrowed items",
           },
           {
-            label: "Overdue items",
-            value: 0,
-            note: "Please return items before the due date to avoid penalties.",
+            label: "Pending Requests",
+            value: statsData.pendingBookings || 0,
+            note: "Awaiting approval",
           },
           {
-            label: "Total penalties",
-            value: "৳0",
-            note: "Penalties are calculated based on lab rules and overdue days.",
+            label: "Pending Penalties",
+            value: `৳${statsData.totalPendingAmount || 0}`,
+            note: `${statsData.pendingPenalties || 0} unpaid penalties`,
           },
-        ];
+        ]);
 
-        const mockUpcoming = [
-          {
-            component: "Arduino Uno",
-            qty: 1,
-            dueDate: "2026-01-03",
-            status: "Approved",
-          },
-          {
-            component: "ESP32 Dev Kit",
-            qty: 1,
-            dueDate: "2025-12-30",
-            status: "Requested",
-          },
-        ];
-
-        setStats(mockStats);
-        setUpcoming(mockUpcoming);
+        // Transform bookings to upcoming returns (approved bookings)
+        const bookings = bookingsRes.data || [];
+        const upcomingReturns = bookings
+          .filter((b) => b.status === "approved")
+          .map((b) => ({
+            component: b.component_name,
+            qty: b.quantity,
+            dueDate: b.expected_return_date,
+            status: b.is_overdue ? "Overdue" : "Approved",
+          }));
+        setUpcoming(upcomingReturns);
         setLoading(false);
       })
-      .catch(() => {
-        setError("Could not load dashboard data. Showing sample data.");
+      .catch((err) => {
+        console.error("Dashboard API error:", err);
+        setError("Could not load dashboard data.");
+        setStats([]);
+        setUpcoming([]);
         setLoading(false);
       });
   }, []);

@@ -1,10 +1,16 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { authAPI } from "../../api/auth";
 
 export default function AdminSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const isActive = (path) => location.pathname === path;
+
+  const handleLogout = () => {
+    authAPI.logout();
+    navigate("/");
+  };
 
   const sections = [
     {
@@ -91,7 +97,7 @@ export default function AdminSidebar() {
           Admin Session
         </div>
         <button
-          onClick={() => navigate("/")}
+          onClick={handleLogout}
           className="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 rounded-md"
         >
           Logout

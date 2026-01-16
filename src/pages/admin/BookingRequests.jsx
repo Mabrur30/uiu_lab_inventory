@@ -1,75 +1,102 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout.jsx";
 import Card from "../../components/common/Card.jsx";
 import Badge from "../../components/common/Badge.jsx";
 import { adminAPI } from "../../api/admin";
 
-const MOCK_BOOKINGS = {
-  pending: 8,
-  approved: 45,
-  rejected: 5,
-  requests: [
-    {
-      id: "REQ-089",
-      student: "Tanvir Hossan",
-      studentId: "011221234",
-      component: "Arduino Uno",
-      qty: 2,
-      purpose: "CSE 311 Lab",
-      requested: "2026-01-12",
-      expectedReturn: "2026-01-20",
-      status: "Pending",
-    },
-    {
-      id: "REQ-088",
-      student: "Sabrina Khan",
-      studentId: "011223456",
-      component: "ESP32 Dev Kit",
-      qty: 1,
-      purpose: "IoT Project",
-      requested: "2026-01-12",
-      expectedReturn: "2026-01-25",
-      status: "Pending",
-    },
-    {
-      id: "REQ-087",
-      student: "Fahim Rahman",
-      studentId: "011224567",
-      component: "Ultrasonic Sensor",
-      qty: 3,
-      purpose: "EEE 305 Lab",
-      requested: "2026-01-11",
-      expectedReturn: "2026-01-18",
-      status: "Pending",
-    },
-  ],
-};
-
 export default function BookingRequests() {
   const [filter, setFilter] = useState("pending");
-  const [bookings] = useState(MOCK_BOOKINGS);
+  const [counts, setCounts] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
+  const [requests, setRequests] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const filteredRequests = bookings.requests.filter((req) => {
+  const loadBookings = async () => {
+    try {
+      setLoading(true);
+      const res = await adminAPI.getAllBookings({
+        status: filter === "all" ? undefined : filter,
+      });
+      const bookings = res.data || [];
+
+      // Transform bookings
+      const formattedRequests = bookings.map((b) => ({
+        id: b.booking_id,
+        student: b.full_name || "Unknown",
+        studentId: b.user_id,
+        component: b.component_name || "Unknown",
+        qty: b.quantity,
+        purpose: b.purpose || "N/A",
+        requested: new Date(b.booking_date).toLocaleDateString(),
+        expectedReturn: b.expected_return_date
+          ? new Date(b.expected_return_date).toLocaleDateString()
+          : "N/A",
+        status: b.status,
+      }));
+
+      setRequests(formattedRequests);
+
+      // Get counts for each status
+      const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
+        adminAPI.getAllBookings({ status: "pending" }),
+        adminAPI.getAllBookings({ status: "approved" }),
+        adminAPI.getAllBookings({ status: "rejected" }),
+      ]);
+
+      setCounts({
+        pending: (pendingRes.data || []).length,
+        approved: (approvedRes.data || []).length,
+        rejected: (rejectedRes.data || []).length,
+      });
+
+      setLoading(false);
+    } catch (err) {
+      console.error("Failed to load booking requests:", err);
+      setRequests([]);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBookings();
+  }, [filter]);
+
+  const filteredRequests = requests.filter((req) => {
     if (search) {
       return (
-        req.student.toLowerCase().includes(search.toLowerCase()) ||
-        req.studentId.includes(search)
+        req.student?.toLowerCase().includes(search.toLowerCase()) ||
+        req.studentId?.includes(search)
       );
     }
     return true;
   });
 
-  const handleApprove = (id) => {
-    adminAPI.approveBooking(id).then(() => {
+  const handleApprove = async (id) => {
+    try {
+      await adminAPI.approveBooking(id);
       alert("Booking approved!");
-    });
+      loadBookings();
+    } catch (err) {
+      console.error("Failed to approve booking:", err);
+      alert("Failed to approve booking");
+    }
   };
 
-  const handleReject = (id) => {
-    adminAPI.rejectBooking(id).then(() => {
+  const handleReject = async (id) => {
+    const reason = prompt("Enter rejection reason:");
+    if (!reason) return;
+    try {
+      await adminAPI.rejectBooking(id, reason);
       alert("Booking rejected!");
-    });
+      loadBookings();
+    } catch (err) {
+      console.error("Failed to reject booking:", err);
+      alert("Failed to reject booking");
+    }
   };
 
   return (
@@ -86,9 +113,9 @@ export default function BookingRequests() {
           {/* Filter tabs */}
           <div className="flex gap-2 mb-4 border-b border-slate-200">
             {[
-              { key: "pending", label: `Pending (${bookings.pending})` },
-              { key: "approved", label: `Approved (${bookings.approved})` },
-              { key: "rejected", label: `Rejected (${bookings.rejected})` },
+              { key: "pending", label: `Pending (${counts.pending})` },
+              { key: "approved", label: `Approved (${counts.approved})` },
+              { key: "rejected", label: `Rejected (${counts.rejected})` },
               { key: "all", label: "All" },
             ].map((tab) => (
               <button
@@ -156,18 +183,18 @@ export default function BookingRequests() {
                   <td className="py-3 px-3">
                     <Badge
                       variant={
-                        req.status === "Pending"
+                        req.status === "pending"
                           ? "warning"
-                          : req.status === "Approved"
-                          ? "success"
-                          : "error"
+                          : req.status === "approved"
+                            ? "success"
+                            : "error"
                       }
                     >
                       {req.status}
                     </Badge>
                   </td>
                   <td className="py-3 px-3 space-x-1 flex">
-                    {req.status === "Pending" && (
+                    {req.status === "pending" && (
                       <>
                         <button
                           onClick={() => handleApprove(req.id)}

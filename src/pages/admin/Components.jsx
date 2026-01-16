@@ -1,60 +1,65 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout.jsx";
 import Card from "../../components/common/Card.jsx";
 import Badge from "../../components/common/Badge.jsx";
 import Button from "../../components/common/Button.jsx";
 import { adminAPI } from "../../api/admin";
 
-const MOCK_COMPONENTS = [
-  {
-    id: "COMP001",
-    component: "Arduino Uno",
-    category: "Microcontroller",
-    totalStock: 15,
-    available: 8,
-    inUse: 7,
-    location: "Lab A · Shelf 1",
-    status: "Good",
-  },
-  {
-    id: "COMP002",
-    component: "ESP32 Dev Kit",
-    category: "Microcontroller",
-    totalStock: 20,
-    available: 12,
-    inUse: 8,
-    location: "Lab A · Shelf 2",
-    status: "Good",
-  },
-  {
-    id: "COMP003",
-    component: "Raspberry Pi 4",
-    category: "SBC",
-    totalStock: 10,
-    available: 5,
-    inUse: 5,
-    location: "Lab B · Shelf 1",
-    status: "Good",
-  },
-];
-
 export default function Components() {
   const [search, setSearch] = useState("");
-  const [components, setComponents] = useState(MOCK_COMPONENTS);
+  const [components, setComponents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadComponents();
+  }, []);
+
+  const loadComponents = () => {
+    setLoading(true);
+    adminAPI
+      .getComponents()
+      .then((res) => {
+        // Map backend response to frontend format
+        const mapped = (res.data || []).map((c) => ({
+          id: c.components_id,
+          code:
+            c.component_code ||
+            `COMP${String(c.components_id).padStart(3, "0")}`,
+          component: c.name,
+          category: c.category || "Uncategorized",
+          totalStock: c.total_quantity,
+          available: c.available_quantity,
+          inUse: c.total_quantity - c.available_quantity,
+          location: c.location || "Lab A",
+          status: c.status || "available",
+        }));
+        setComponents(mapped);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load components:", err);
+        setComponents([]);
+        setLoading(false);
+      });
+  };
 
   const filteredComponents = components.filter((c) =>
     search
       ? c.component.toLowerCase().includes(search.toLowerCase()) ||
         c.id.includes(search)
-      : true
+      : true,
   );
 
-  const handleDelete = (componentId) => {
+  const handleDelete = async (componentId) => {
     if (confirm("Are you sure you want to delete this component?")) {
-      adminAPI.deleteComponent(componentId).then(() => {
-        setComponents(components.filter((c) => c.id !== componentId));
+      try {
+        await adminAPI.deleteComponent(componentId);
         alert("Component deleted!");
-      });
+        loadComponents();
+      } catch (err) {
+        console.error("Failed to delete component:", err);
+        alert("Failed to delete component");
+      }
     }
   };
 
@@ -111,7 +116,7 @@ export default function Components() {
                   key={comp.id}
                   className="border-b border-slate-100 last:border-0"
                 >
-                  <td className="py-3 px-3 font-semibold">{comp.id}</td>
+                  <td className="py-3 px-3 font-semibold">{comp.code}</td>
                   <td className="py-3 px-3 font-semibold text-slate-900">
                     {comp.component}
                   </td>

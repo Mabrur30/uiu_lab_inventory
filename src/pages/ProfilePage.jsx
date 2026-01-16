@@ -4,47 +4,57 @@ import AuthenticatedLayout from "../components/layout/AuthenticatedLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import Button from "../components/common/Button.jsx";
 import { profileAPI } from "../api/profile";
+import { dashboardAPI } from "../api/dashboard";
 
 const DEFAULT_PROFILE = {
-  name: "Tamvir Hossan",
-  studentId: "01122xxxx",
-  department: "Computer Science & Engineering",
-  email: "tamvir@student.uiu.ac.bd",
-  phone: "+880 1712-345678",
-  batch: "Fall 2022",
-  memberSince: "October 15, 2023",
+  full_name: "",
+  id: "",
+  department: "",
+  email: "",
+  phone_number: "",
+  role: "student",
 };
-
-const ACCOUNT_STATS = [
-  { label: "Total bookings", value: 15 },
-  { label: "Active bookings", value: 2 },
-  { label: "Completed", value: 12 },
-  { label: "Overdue instances", value: 1 },
-];
 
 export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(DEFAULT_PROFILE);
   const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState({
-    bookingUpdates: true,
-    returnReminders: true,
-    penaltyNotifications: false,
+  const [accountStats, setAccountStats] = useState([]);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
-  const [contactMethod, setContactMethod] = useState("Email");
+  const [passwordMessage, setPasswordMessage] = useState("");
 
   // Load profile via API
   useEffect(() => {
-    profileAPI
-      .getProfile()
-      .then(() => {
-        // When backend is ready, replace with res.data
-        setForm(DEFAULT_PROFILE);
+    Promise.all([profileAPI.getProfile(), dashboardAPI.getUserStats()])
+      .then(([profileRes, statsRes]) => {
+        const profile = profileRes.data || DEFAULT_PROFILE;
+        setForm({
+          full_name: profile.full_name || "",
+          id: profile.id || "",
+          department: profile.department || "",
+          email: profile.email || "",
+          phone_number: profile.phone_number || "",
+          role: profile.role || "student",
+        });
+
+        const stats = statsRes.data || {};
+        setAccountStats([
+          { label: "Total bookings", value: stats.totalBookings || 0 },
+          { label: "Active bookings", value: stats.activeBookings || 0 },
+          { label: "Returned", value: stats.returnedBookings || 0 },
+          { label: "Overdue instances", value: stats.overdueBookings || 0 },
+        ]);
+
         setLoading(false);
       })
-      .catch(() => {
-        // On error, show mock data
+      .catch((err) => {
+        console.error("Failed to load profile:", err);
         setForm(DEFAULT_PROFILE);
+        setAccountStats([]);
         setLoading(false);
       });
   }, []);
@@ -61,14 +71,62 @@ export default function ProfilePage() {
 
   const onSave = (e) => {
     e.preventDefault();
-    profileAPI.updateProfile(form);
-    setEditing(false);
+    profileAPI
+      .updateProfile({
+        full_name: form.full_name,
+        phone_number: form.phone_number,
+        department: form.department,
+      })
+      .then(() => {
+        setEditing(false);
+        alert("Profile updated successfully!");
+      })
+      .catch((err) => {
+        console.error("Failed to update profile:", err);
+        alert("Failed to update profile.");
+      });
   };
 
-  const handleNotificationChange = (key) => {
-    const updated = { ...notifications, [key]: !notifications[key] };
-    setNotifications(updated);
-    profileAPI.updateNotifications(updated);
+  const onPasswordChange = (e) => {
+    e.preventDefault();
+    setPasswordMessage("");
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordMessage("New passwords do not match!");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordMessage("Password must be at least 6 characters!");
+      return;
+    }
+
+    profileAPI
+      .changePassword(passwordForm.currentPassword, passwordForm.newPassword)
+      .then(() => {
+        setPasswordMessage("Password changed successfully!");
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to change password:", err);
+        setPasswordMessage(
+          err.response?.data?.message || "Failed to change password.",
+        );
+      });
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
@@ -79,16 +137,17 @@ export default function ProfilePage() {
           <Card>
             <div className="flex flex-col items-center py-4">
               <div className="w-24 h-24 rounded-full bg-primary-500 text-white flex items-center justify-center text-3xl font-bold mb-3">
-                TH
+                {getInitials(form.full_name)}
               </div>
               <h2 className="text-lg font-semibold text-slate-900">
-                {form.name}
+                {form.full_name || "User"}
               </h2>
               <p className="text-xs text-slate-500">
-                Student · Department of CSE
+                {form.role === "admin" ? "Admin" : "Student"} ·{" "}
+                {form.department || "N/A"}
               </p>
               <div className="mt-3 px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-[11px] font-semibold">
-                Active since Oct 2023
+                ID: {form.id}
               </div>
             </div>
           </Card>
@@ -98,7 +157,7 @@ export default function ProfilePage() {
               Account statistics
             </h3>
             <div className="space-y-2 text-xs">
-              {ACCOUNT_STATS.map((s) => (
+              {accountStats.map((s) => (
                 <div
                   key={s.label}
                   className="flex items-center justify-between"
@@ -137,8 +196,8 @@ export default function ProfilePage() {
                       Full name
                     </label>
                     <input
-                      name="name"
-                      value={form.name}
+                      name="full_name"
+                      value={form.full_name}
                       onChange={onChange}
                       className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
                     />
@@ -148,7 +207,7 @@ export default function ProfilePage() {
                       Student ID
                     </label>
                     <input
-                      value={form.studentId}
+                      value={form.id}
                       disabled
                       className="w-full border border-slate-200 bg-slate-50 rounded-md px-3 py-2 text-sm text-slate-500"
                     />
@@ -175,8 +234,8 @@ export default function ProfilePage() {
                     <input
                       name="email"
                       value={form.email}
-                      onChange={onChange}
-                      className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
+                      disabled
+                      className="w-full border border-slate-200 bg-slate-50 rounded-md px-3 py-2 text-sm text-slate-500"
                     />
                   </div>
                   <div>
@@ -184,8 +243,8 @@ export default function ProfilePage() {
                       Phone
                     </label>
                     <input
-                      name="phone"
-                      value={form.phone}
+                      name="phone_number"
+                      value={form.phone_number}
                       onChange={onChange}
                       className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
                     />
@@ -199,96 +258,91 @@ export default function ProfilePage() {
             ) : (
               <div className="space-y-4 text-sm">
                 <div className="grid md:grid-cols-2 gap-4">
-                  <InfoRow label="Full name" value={form.name} />
-                  <InfoRow label="Student ID" value={form.studentId} />
+                  <InfoRow label="Full name" value={form.full_name} />
+                  <InfoRow label="Student ID" value={form.id} />
                 </div>
                 <InfoRow label="Department" value={form.department} />
                 <div className="grid md:grid-cols-2 gap-4">
                   <InfoRow label="Email" value={form.email} />
-                  <InfoRow label="Phone" value={form.phone} />
+                  <InfoRow label="Phone" value={form.phone_number} />
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <InfoRow label="Batch" value={form.batch} />
-                  <InfoRow label="Member since" value={form.memberSince} />
-                </div>
+                <InfoRow
+                  label="Role"
+                  value={form.role === "admin" ? "Administrator" : "Student"}
+                />
               </div>
             )}
           </Card>
 
           <Card>
             <h2 className="text-lg font-semibold text-slate-900 mb-4">
-              Security & preferences
+              Change Password
             </h2>
 
-            <div className="space-y-4 text-sm">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-slate-900">
-                    Change password
-                  </span>
-                  <Button size="sm" variant="outline">
-                    Update password
-                  </Button>
+            <form onSubmit={onPasswordChange} className="space-y-4 text-sm">
+              {passwordMessage && (
+                <div
+                  className={`p-3 rounded-md text-xs ${
+                    passwordMessage.includes("success")
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {passwordMessage}
                 </div>
-                <p className="text-xs text-slate-500">
-                  For security reasons, you&apos;ll be redirected to the
-                  password update screen.
-                </p>
-              </div>
-
-              <div>
-                <span className="font-semibold text-slate-900 text-sm">
-                  Email notifications
-                </span>
-                <div className="mt-2 space-y-1 text-xs">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={notifications.bookingUpdates}
-                      onChange={() =>
-                        handleNotificationChange("bookingUpdates")
-                      }
-                    />
-                    <span>Booking status updates</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={notifications.returnReminders}
-                      onChange={() =>
-                        handleNotificationChange("returnReminders")
-                      }
-                    />
-                    <span>Return reminders</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={notifications.penaltyNotifications}
-                      onChange={() =>
-                        handleNotificationChange("penaltyNotifications")
-                      }
-                    />
-                    <span>Penalty notifications</span>
-                  </label>
-                </div>
-              </div>
-
+              )}
               <div>
                 <label className="block text-xs text-slate-600 mb-1">
-                  Preferred contact method
+                  Current Password
                 </label>
-                <select
-                  value={contactMethod}
-                  onChange={(e) => setContactMethod(e.target.value)}
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      currentPassword: e.target.value,
+                    })
+                  }
                   className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
-                >
-                  <option>Email</option>
-                  <option>Phone</option>
-                  <option>SMS</option>
-                </select>
+                />
               </div>
-            </div>
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      newPassword: e.target.value,
+                    })
+                  }
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
+                />
+              </div>
+              <Button type="submit" className="w-full">
+                Update Password
+              </Button>
+            </form>
           </Card>
         </div>
       </div>
@@ -300,7 +354,7 @@ function InfoRow({ label, value }) {
   return (
     <div>
       <div className="text-xs text-slate-500 mb-1">{label}</div>
-      <div className="font-medium text-slate-900">{value}</div>
+      <div className="font-medium text-slate-900">{value || "N/A"}</div>
     </div>
   );
 }

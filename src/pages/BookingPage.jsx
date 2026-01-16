@@ -5,30 +5,6 @@ import Card from "../components/common/Card.jsx";
 import Button from "../components/common/Button.jsx";
 import { bookingsAPI } from "../api/bookings";
 
-const MOCK_COMPONENTS = [
-  {
-    id: 1,
-    name: "3.2 inch TFT LCD Display Module",
-    code: "COMP-001",
-    available: 2,
-    image: "https://via.placeholder.com/400x300.png?text=3.2+TFT+LCD",
-  },
-  {
-    id: 2,
-    name: "Serial Port RS232 to TTL Converter",
-    code: "COMP-002",
-    available: 5,
-    image: "https://via.placeholder.com/400x300.png?text=RS232+TTL",
-  },
-  {
-    id: 3,
-    name: "ESC40A Brushless Motor ESC",
-    code: "COMP-003",
-    available: 3,
-    image: "https://via.placeholder.com/400x300.png?text=ESC+40A",
-  },
-];
-
 export default function BookingPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -39,7 +15,8 @@ export default function BookingPage() {
   const [message, setMessage] = useState("");
 
   // API state
-  const [components, setComponents] = useState(MOCK_COMPONENTS);
+  const [components, setComponents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsItem, setDetailsItem] = useState(null);
 
@@ -47,20 +24,31 @@ export default function BookingPage() {
   useEffect(() => {
     bookingsAPI
       .getComponents()
-      .then(() => {
-        // When backend is ready, replace with res.data
-        setComponents(MOCK_COMPONENTS);
+      .then((res) => {
+        // Map backend fields to frontend expected format
+        const mapped = res.data.map((c) => ({
+          id: c.components_id,
+          name: c.component_name,
+          code: c.component_code,
+          available: c.available_quantity,
+          image: `https://via.placeholder.com/400x300.png?text=${encodeURIComponent(
+            c.component_name,
+          )}`,
+        }));
+        setComponents(mapped);
+        setLoading(false);
       })
-      .catch(() => {
-        // On error, show mock data
-        setComponents(MOCK_COMPONENTS);
+      .catch((err) => {
+        console.error("Failed to load components:", err);
+        setMessage("Failed to load components. Please try again.");
+        setLoading(false);
       });
   }, []);
 
   const filtered = components.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.code.toLowerCase().includes(search.toLowerCase())
+      c.code.toLowerCase().includes(search.toLowerCase()),
   );
 
   const submit = (e) => {
@@ -75,48 +63,50 @@ export default function BookingPage() {
       return;
     }
 
-    // Build payload
+    // Build payload matching backend expected fields
+    // user_id is automatically taken from the JWT token in the backend
     const payload = {
-      componentId: selected.id,
+      components_id: selected.id,
       quantity: qty,
-      expectedReturn,
-      course,
-      details,
+      expected_return_date: expectedReturn,
+      reason: `${course}${details ? " - " + details : ""}`,
     };
 
-    // 1) Log what you are sending
-    console.log("Booking payload about to send:", payload);
+    console.log("Booking payload:", payload);
 
-    // 2) For now: do NOT call the fake backend, just simulate
-    setTimeout(() => {
-      console.log("Pretend backend accepted booking.");
-      setMessage("Booking request submitted successfully (mock).");
-      setSelected(null);
-      setQty(1);
-      setExpectedReturn("");
-      setCourse("");
-      setDetails("");
-    }, 500);
-
-    // If you want to really call backend later, uncomment this and
-    // remove the setTimeout above, but you must set a real baseURL.
-    /*
-  bookingsAPI
-    .createBooking(payload)
-    .then((res) => {
-      console.log("Booking API success, response data:", res.data);
-      setMessage("Booking request submitted successfully.");
-      setSelected(null);
-      setQty(1);
-      setExpectedReturn("");
-      setCourse("");
-      setDetails("");
-    })
-    .catch((err) => {
-      console.log("Booking API error:", err.response || err);
-      setMessage("Failed to submit booking. Check console for details.");
-    });
-  */
+    bookingsAPI
+      .createBooking(payload)
+      .then((res) => {
+        console.log("Booking API success:", res.data);
+        setMessage("Booking request submitted successfully!");
+        setSelected(null);
+        setQty(1);
+        setExpectedReturn("");
+        setCourse("");
+        setDetails("");
+        // Refresh components to update available quantity
+        bookingsAPI.getComponents().then((res) => {
+          const mapped = res.data.map((c) => ({
+            id: c.components_id,
+            name: c.component_name,
+            code: c.component_code,
+            available: c.available_quantity,
+            category: c.category,
+            description: c.description,
+            image: `https://via.placeholder.com/400x300.png?text=${encodeURIComponent(
+              c.component_name,
+            )}`,
+          }));
+          setComponents(mapped);
+        });
+      })
+      .catch((err) => {
+        console.error("Booking API error:", err.response || err);
+        setMessage(
+          "Failed to submit booking. " +
+            (err.response?.data?.message || "Please try again."),
+        );
+      });
   };
 
   return (
@@ -144,78 +134,88 @@ export default function BookingPage() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((c) => (
-                <div
-                  key={c.id}
-                  className={`border rounded-lg overflow-hidden bg-white flex flex-col ${
-                    selected?.id === c.id
-                      ? "border-primary-500 shadow-md"
-                      : "border-slate-200 hover:shadow-sm"
-                  }`}
-                >
-                  {/* image */}
-                  <div className="aspect-[4/3] bg-slate-100">
-                    <img
-                      src={c.image}
-                      alt={c.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+            {loading ? (
+              <p className="text-sm text-slate-600 py-8 text-center">
+                Loading components...
+              </p>
+            ) : components.length === 0 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">
+                No components available.
+              </p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {filtered.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`border rounded-lg overflow-hidden bg-white flex flex-col ${
+                      selected?.id === c.id
+                        ? "border-primary-500 shadow-md"
+                        : "border-slate-200 hover:shadow-sm"
+                    }`}
+                  >
+                    {/* image */}
+                    <div className="aspect-[4/3] bg-slate-100">
+                      <img
+                        src={c.image}
+                        alt={c.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
 
-                  {/* content */}
-                  <div className="p-3 flex-1 flex flex-col">
-                    <h3 className="text-sm font-semibold text-slate-900 mb-1 line-clamp-2">
-                      {c.name}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mb-2">
-                      Code: {c.code}
-                    </p>
+                    {/* content */}
+                    <div className="p-3 flex-1 flex flex-col">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-1 line-clamp-2">
+                        {c.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mb-2">
+                        Code: {c.code}
+                      </p>
 
-                    <div className="mt-auto space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-600">
-                          Availability:{" "}
-                          <span className="font-semibold text-primary-600">
-                            {c.available}
+                      <div className="mt-auto space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-600">
+                            Availability:{" "}
+                            <span className="font-semibold text-primary-600">
+                              {c.available}
+                            </span>
                           </span>
-                        </span>
-                      </div>
+                        </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDetailsItem(c);
-                            setDetailsOpen(true);
-                          }}
-                          className="flex-1 text-xs font-semibold border border-slate-300 text-slate-700 rounded-full py-1.5 hover:bg-slate-50"
-                        >
-                          View details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelected(c);
-                            setQty(1);
-                            setMessage("");
-                          }}
-                          className="flex-1 text-xs font-semibold border border-primary-500 text-white bg-primary-500 rounded-full py-1.5 hover:bg-primary-600"
-                        >
-                          Select
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDetailsItem(c);
+                              setDetailsOpen(true);
+                            }}
+                            className="flex-1 text-xs font-semibold border border-slate-300 text-slate-700 rounded-full py-1.5 hover:bg-slate-50"
+                          >
+                            View details
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelected(c);
+                              setQty(1);
+                              setMessage("");
+                            }}
+                            className="flex-1 text-xs font-semibold border border-primary-500 text-white bg-primary-500 rounded-full py-1.5 hover:bg-primary-600"
+                          >
+                            Select
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              {filtered.length === 0 && (
-                <p className="text-sm text-slate-500 col-span-full">
-                  No components match your search.
-                </p>
-              )}
-            </div>
+                {filtered.length === 0 && (
+                  <p className="text-sm text-slate-500 col-span-full">
+                    No components match your search.
+                  </p>
+                )}
+              </div>
+            )}
           </Card>
         </div>
 

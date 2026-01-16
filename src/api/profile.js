@@ -2,12 +2,13 @@
 import api from "./axios";
 
 export const profileAPI = {
-  // GET /profile – fetch student profile
-  getProfile: () => api.get("/profile"),
+  // GET /users/profile – fetch current user profile
+  getProfile: () => api.get("/users/profile"),
 
-  // PUT /profile – update profile info
-  updateProfile: (payload) => api.put("/profile", payload),
+  // PUT /users/profile – update profile info
+  updateProfile: (payload) => api.put("/users/profile", payload),
 
-  // PUT /profile/notifications – update notification settings
-  updateNotifications: (payload) => api.put("/profile/notifications", payload),
+  // PUT /users/change-password – change password
+  changePassword: (currentPassword, newPassword) =>
+    api.put("/users/change-password", { currentPassword, newPassword }),
 };

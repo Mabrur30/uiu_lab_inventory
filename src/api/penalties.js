@@ -2,9 +2,9 @@
 import api from "./axios";
 
 export const penaltiesAPI = {
-  // GET /penalties – fetch penalties overview and history
-  getPenalties: () => api.get("/penalties"),
+  // GET /penalties/my – fetch current user's penalties
+  getMyPenalties: () => api.get("/penalties/my"),
 
-  // POST /penalties/:id/mark-paid – mark penalty as paid
-  markPaid: (penaltyId) => api.post(`/penalties/${penaltyId}/mark-paid`),
+  // GET /penalties/:penaltyId – get penalty by ID
+  getPenaltyById: (penaltyId) => api.get(`/penalties/${penaltyId}`),
 };

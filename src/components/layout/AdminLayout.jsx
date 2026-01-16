@@ -1,6 +1,15 @@
+import { useState, useEffect } from "react";
 import AdminSidebar from "../common/AdminSidebar.jsx";
+import { authAPI } from "../../api/auth";
 
 export default function AdminLayout({ title, children }) {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const currentUser = authAPI.getCurrentUser();
+    setUser(currentUser);
+  }, []);
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <AdminSidebar />
@@ -22,10 +31,10 @@ export default function AdminLayout({ title, children }) {
             </div>
             <div className="text-right text-xs md:text-sm">
               <div className="font-semibold text-slate-900">
-                Dr. Ahmed Rahman
+                {user?.full_name || "Admin"}
               </div>
               <div className="text-slate-500">
-                Lab Coordinator · CSE Department
+                {user?.department || "Administrator"}
               </div>
             </div>
           </div>

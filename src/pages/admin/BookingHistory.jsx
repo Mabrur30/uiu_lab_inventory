@@ -1,40 +1,61 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout.jsx";
 import Card from "../../components/common/Card.jsx";
 import Badge from "../../components/common/Badge.jsx";
-
-const MOCK_HISTORY = [
-  {
-    id: "BOOK-125",
-    student: "Rakib Ahmed",
-    studentId: "011224567",
-    component: "Raspberry Pi 4",
-    checkoutDate: "2025-12-15",
-    returnDate: "2025-12-28",
-    duration: "13 days",
-    status: "Returned",
-  },
-  {
-    id: "BOOK-124",
-    student: "Sabrina Khan",
-    studentId: "011223456",
-    component: "Arduino Uno",
-    checkoutDate: "2025-12-10",
-    returnDate: "2025-12-20",
-    duration: "10 days",
-    status: "Returned",
-  },
-];
+import { adminAPI } from "../../api/admin";
 
 export default function BookingHistory() {
   const [search, setSearch] = useState("");
-  const [history] = useState(MOCK_HISTORY);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        setLoading(true);
+        // Get completed/returned bookings
+        const res = await adminAPI.getAllBookings({ status: "returned" });
+        const bookings = res.data || [];
+
+        const mapped = bookings.map((b) => {
+          const checkoutDate = new Date(b.booking_date);
+          const returnDate = b.actual_return_date
+            ? new Date(b.actual_return_date)
+            : null;
+          const duration = returnDate
+            ? Math.ceil((returnDate - checkoutDate) / (1000 * 60 * 60 * 24))
+            : "N/A";
+
+          return {
+            id: b.booking_id,
+            student: b.full_name || "Unknown",
+            studentId: b.user_id,
+            component: b.component_name || "Unknown",
+            checkoutDate: checkoutDate.toLocaleDateString(),
+            returnDate: returnDate ? returnDate.toLocaleDateString() : "N/A",
+            duration:
+              typeof duration === "number" ? `${duration} days` : duration,
+            status: b.status,
+          };
+        });
+
+        setHistory(mapped);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load booking history:", err);
+        setHistory([]);
+        setLoading(false);
+      }
+    };
+
+    loadHistory();
+  }, []);
 
   const filteredHistory = history.filter((h) =>
     search
-      ? h.student.toLowerCase().includes(search.toLowerCase()) ||
-        h.studentId.includes(search)
-      : true
+      ? h.student?.toLowerCase().includes(search.toLowerCase()) ||
+        h.studentId?.includes(search)
+      : true,
   );
 
   return (

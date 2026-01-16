@@ -59,15 +59,25 @@ export default function AddComponent() {
       return;
     }
 
+    // Map form data to backend format
+    const componentData = {
+      component_name: formData.componentName,
+      component_code: formData.componentId,
+      category: formData.category,
+      total_quantity: parseInt(formData.totalQuantity, 10),
+      available_quantity: parseInt(formData.totalQuantity, 10),
+      description: formData.description || null,
+    };
+
     // Call API
     adminAPI
-      .addComponent(formData)
+      .addComponent(componentData)
       .then(() => {
         alert("Component added successfully!");
         navigate("/admin/components");
       })
       .catch((err) => {
-        alert("Error adding component!");
+        alert(err.response?.data?.message || "Error adding component!");
         console.error(err);
       })
       .finally(() => {

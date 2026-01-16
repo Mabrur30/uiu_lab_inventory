@@ -1,54 +1,79 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout.jsx";
 import Card from "../../components/common/Card.jsx";
 import Badge from "../../components/common/Badge.jsx";
 import { adminAPI } from "../../api/admin";
 
-const MOCK_PENALTIES = [
-  {
-    id: "PEN-045",
-    student: "Tanvir Hossan",
-    studentId: "011221234",
-    component: "Arduino Uno",
-    type: "Late Return (5 days)",
-    amount: 250,
-    date: "2025-12-20",
-    status: "Pending",
-  },
-  {
-    id: "PEN-044",
-    student: "Fahim Rahman",
-    studentId: "011225678",
-    component: "ESP32 Dev Kit",
-    type: "Damage",
-    amount: 500,
-    date: "2025-12-15",
-    status: "Pending",
-  },
-];
-
 export default function PenaltyManagement() {
   const [search, setSearch] = useState("");
-  const [penalties] = useState(MOCK_PENALTIES);
+  const [penalties, setPenalties] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const stats = {
-    total: 12500,
-    collected: 8000,
-    pending: 4500,
-    students: 12,
+  const [stats, setStats] = useState({
+    total: 0,
+    collected: 0,
+    pending: 0,
+    students: 0,
+  });
+
+  const loadPenalties = async () => {
+    try {
+      setLoading(true);
+      const [penaltiesRes, statsRes] = await Promise.all([
+        adminAPI.getAllPenalties(),
+        adminAPI.getPenaltyStats(),
+      ]);
+
+      const penaltiesData = penaltiesRes.data || [];
+      const statsData = statsRes.data || {};
+
+      // Transform penalties
+      const mapped = penaltiesData.map((p) => ({
+        id: p.penalty_id,
+        student: p.full_name || "Unknown",
+        studentId: p.user_id,
+        component: p.component_name || "N/A",
+        type: p.penalty_type,
+        amount: p.amount,
+        date: new Date(p.penalty_date).toLocaleDateString(),
+        status: p.status,
+      }));
+
+      setPenalties(mapped);
+      setStats({
+        total: statsData.totalAmount || 0,
+        collected: statsData.paidAmount || 0,
+        pending: statsData.pendingAmount || 0,
+        students: statsData.studentsWithPenalties || 0,
+      });
+      setLoading(false);
+    } catch (err) {
+      console.error("Failed to load penalties:", err);
+      setPenalties([]);
+      setLoading(false);
+    }
   };
 
-  const handleMarkPaid = (penaltyId) => {
-    adminAPI.markPenaltyPaid(penaltyId).then(() => {
+  useEffect(() => {
+    loadPenalties();
+  }, []);
+
+  const handleMarkPaid = async (penaltyId) => {
+    try {
+      await adminAPI.updatePenaltyStatus(penaltyId, "paid");
       alert("Penalty marked as paid!");
-    });
+      loadPenalties();
+    } catch (err) {
+      console.error("Failed to update penalty:", err);
+      alert("Failed to update penalty status");
+    }
   };
 
   const filteredPenalties = penalties.filter((p) =>
     search
       ? p.student.toLowerCase().includes(search.toLowerCase()) ||
         p.studentId.includes(search)
-      : true
+      : true,
   );
 
   return (
@@ -140,13 +165,13 @@ export default function PenaltyManagement() {
                   <td className="py-3 px-3 text-xs">{p.date}</td>
                   <td className="py-3 px-3">
                     <Badge
-                      variant={p.status === "Pending" ? "warning" : "success"}
+                      variant={p.status === "pending" ? "warning" : "success"}
                     >
                       {p.status}
                     </Badge>
                   </td>
                   <td className="py-3 px-3 space-x-1 flex">
-                    {p.status === "Pending" && (
+                    {p.status === "pending" && (
                       <button
                         onClick={() => handleMarkPaid(p.id)}
                         className="px-3 py-1 bg-emerald-500 text-white text-xs rounded font-semibold hover:bg-emerald-600"

@@ -5,121 +5,142 @@ import Badge from "../components/common/Badge.jsx";
 import Button from "../components/common/Button.jsx";
 import { adminAPI } from "../api/admin";
 
-const MOCK_DASHBOARD = {
-  stats: [
-    {
-      label: "PENDING REQUESTS",
-      value: 8,
-      icon: "⏳",
-      color: "amber",
-      description: "Require immediate attention",
-    },
-    {
-      label: "ACTIVE BOOKINGS",
-      value: 45,
-      icon: "✓",
-      color: "emerald",
-      description: "Currently checked out",
-    },
-    {
-      label: "OVERDUE ITEMS",
-      value: 6,
-      icon: "⚠️",
-      color: "red",
-      description: "Follow up required",
-    },
-    {
-      label: "LOW STOCK",
-      value: 3,
-      icon: "📦",
-      color: "cyan",
-      description: "Need reordering",
-    },
-  ],
-  recentBookings: [
-    {
-      id: "REQ-089",
-      student: "Tanvir Hossan",
-      studentId: "011221234",
-      component: "Arduino Uno",
-      qty: 2,
-      purpose: "CSE 311 Lab",
-      status: "Pending",
-      requestDate: "2026-01-12",
-      actions: ["Approve", "Reject"],
-    },
-    {
-      id: "REQ-088",
-      student: "Sabrina Khan",
-      studentId: "011223456",
-      component: "ESP32 Dev Kit",
-      qty: 1,
-      purpose: "IoT Project",
-      status: "Pending",
-      requestDate: "2026-01-12",
-      actions: ["Approve", "Reject"],
-    },
-    {
-      id: "REQ-087",
-      student: "Rakib Ahmed",
-      studentId: "011225678",
-      component: "Raspberry Pi 4",
-      qty: 1,
-      purpose: "Final Year Project",
-      status: "Approved",
-      requestDate: "2026-01-10",
-      actions: ["View"],
-    },
-  ],
-  inventory: [
-    {
-      component: "Arduino Uno",
-      total: 15,
-      available: 8,
-      inUse: 7,
-      status: "Good",
-    },
-    {
-      component: "ESP32 Dev Kit",
-      total: 20,
-      available: 12,
-      inUse: 8,
-      status: "Good",
-    },
-    {
-      component: "Ultrasonic Sensor",
-      total: 10,
-      available: 2,
-      inUse: 8,
-      status: "Low stock",
-      statusColor: "red",
-    },
-    {
-      component: "Raspberry Pi 4",
-      total: 10,
-      available: 5,
-      inUse: 5,
-      status: "Good",
-    },
-  ],
+const EMPTY_DASHBOARD = {
+  stats: [],
+  recentBookings: [],
+  inventory: [],
 };
 
 export default function AdminDashboard() {
-  const [dashboard, setDashboard] = useState(MOCK_DASHBOARD);
+  const [dashboard, setDashboard] = useState(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminAPI
-      .getDashboard()
-      .then(() => {
-        setDashboard(MOCK_DASHBOARD);
+    Promise.all([
+      adminAPI.getDashboardStats(),
+      adminAPI.getRecentBookings(5),
+      adminAPI.getComponents(),
+    ])
+      .then(([statsRes, bookingsRes, componentsRes]) => {
+        const stats = statsRes.data || {};
+        const bookings = bookingsRes.data || [];
+        const components = componentsRes.data || [];
+
+        // Transform stats to display format
+        const formattedStats = [
+          {
+            label: "Pending Requests",
+            value: stats.pendingBookings || 0,
+            icon: "📋",
+            color: "amber",
+            description: "Bookings awaiting approval",
+          },
+          {
+            label: "Active Bookings",
+            value: stats.activeBookings || 0,
+            icon: "📦",
+            color: "emerald",
+            description: "Currently borrowed items",
+          },
+          {
+            label: "Overdue Items",
+            value: stats.overdueBookings || 0,
+            icon: "⚠️",
+            color: "red",
+            description: "Items past return date",
+          },
+          {
+            label: "Total Components",
+            value: stats.totalComponents || 0,
+            icon: "🔧",
+            color: "cyan",
+            description: "Items in inventory",
+          },
+        ];
+
+        // Transform bookings
+        const formattedBookings = bookings.map((b) => ({
+          id: b.booking_id,
+          student: b.full_name || "Unknown",
+          studentId: b.user_id,
+          component: b.component_name || "Unknown",
+          qty: b.quantity,
+          purpose: b.purpose || "N/A",
+          status: b.status,
+        }));
+
+        // Transform inventory
+        const formattedInventory = components.slice(0, 5).map((c) => ({
+          component: c.name,
+          total: c.total_quantity,
+          available: c.available_quantity,
+          inUse: c.total_quantity - c.available_quantity,
+          statusColor: c.available_quantity < 5 ? "red" : "emerald",
+        }));
+
+        setDashboard({
+          stats: formattedStats,
+          recentBookings: formattedBookings,
+          inventory: formattedInventory,
+        });
         setLoading(false);
       })
-      .catch(() => {
-        setDashboard(MOCK_DASHBOARD);
+      .catch((err) => {
+        console.error("Failed to load dashboard:", err);
+        setDashboard(EMPTY_DASHBOARD);
         setLoading(false);
       });
   }, []);
+
+  const handleApprove = async (bookingId) => {
+    try {
+      await adminAPI.approveBooking(bookingId);
+      // Refresh bookings
+      const bookingsRes = await adminAPI.getRecentBookings(5);
+      const bookings = bookingsRes.data || [];
+      setDashboard((prev) => ({
+        ...prev,
+        recentBookings: bookings.map((b) => ({
+          id: b.booking_id,
+          student: b.full_name || "Unknown",
+          studentId: b.user_id,
+          component: b.component_name || "Unknown",
+          qty: b.quantity,
+          purpose: b.purpose || "N/A",
+          status: b.status,
+        })),
+      }));
+    } catch (err) {
+      console.error("Failed to approve booking:", err);
+      alert("Failed to approve booking");
+    }
+  };
+
+  const handleReject = async (bookingId) => {
+    const reason = prompt("Enter rejection reason:");
+    if (!reason) return;
+    try {
+      await adminAPI.rejectBooking(bookingId, reason);
+      // Refresh bookings
+      const bookingsRes = await adminAPI.getRecentBookings(5);
+      const bookings = bookingsRes.data || [];
+      setDashboard((prev) => ({
+        ...prev,
+        recentBookings: bookings.map((b) => ({
+          id: b.booking_id,
+          student: b.full_name || "Unknown",
+          studentId: b.user_id,
+          component: b.component_name || "Unknown",
+          qty: b.quantity,
+          purpose: b.purpose || "N/A",
+          status: b.status,
+        })),
+      }));
+    } catch (err) {
+      console.error("Failed to reject booking:", err);
+      alert("Failed to reject booking");
+    }
+  };
 
   if (loading) {
     return (
@@ -214,18 +235,32 @@ export default function AdminDashboard() {
                     <td className="py-3 pr-3 text-xs">{b.purpose}</td>
                     <td className="py-3 pr-3">
                       <Badge
-                        variant={b.status === "Pending" ? "warning" : "success"}
+                        variant={
+                          b.status === "pending"
+                            ? "warning"
+                            : b.status === "approved"
+                              ? "success"
+                              : b.status === "rejected"
+                                ? "error"
+                                : "default"
+                        }
                       >
                         {b.status}
                       </Badge>
                     </td>
                     <td className="py-3 space-x-1 flex">
-                      {b.status === "Pending" ? (
+                      {b.status === "pending" ? (
                         <>
-                          <button className="px-2 py-1 bg-emerald-500 text-white text-xs rounded font-semibold hover:bg-emerald-600">
+                          <button
+                            onClick={() => handleApprove(b.id)}
+                            className="px-2 py-1 bg-emerald-500 text-white text-xs rounded font-semibold hover:bg-emerald-600"
+                          >
                             ✓ Approve
                           </button>
-                          <button className="px-2 py-1 bg-red-500 text-white text-xs rounded font-semibold hover:bg-red-600">
+                          <button
+                            onClick={() => handleReject(b.id)}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded font-semibold hover:bg-red-600"
+                          >
                             ✕ Reject
                           </button>
                         </>

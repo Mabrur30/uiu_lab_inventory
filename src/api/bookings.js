@@ -2,14 +2,23 @@ import api from "./axios";
 
 export const bookingsAPI = {
   // GET /components – fetch all components
-  getComponents: () => api.get("/components"),
+  getComponents: (params = {}) => api.get("/components", { params }),
 
-  // GET /bookings?filter=all|active|completed|overdue
-  getBookings: (filter = "all") => api.get("/bookings", { params: { filter } }),
+  // GET /components/categories – fetch all categories
+  getCategories: () => api.get("/components/categories"),
+
+  // GET /bookings/my – get current user's bookings
+  getMyBookings: () => api.get("/bookings/my"),
+
+  // GET /bookings/:bookingId – get booking by ID
+  getBookingById: (bookingId) => api.get(`/bookings/${bookingId}`),
 
   // POST /bookings – create new booking
   createBooking: (payload) => api.post("/bookings", payload),
 
-  // POST /bookings/:id/return – mark booking as returned
-  returnBooking: (bookingId) => api.post(`/bookings/${bookingId}/return`),
+  // PATCH /bookings/:id/return – mark booking as returned
+  returnBooking: (bookingId) => api.patch(`/bookings/${bookingId}/return`),
+
+  // DELETE /bookings/:id – cancel/delete booking
+  cancelBooking: (bookingId) => api.delete(`/bookings/${bookingId}`),
 };

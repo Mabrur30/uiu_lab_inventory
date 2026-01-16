@@ -6,31 +6,6 @@ import Badge from "../components/common/Badge.jsx";
 import Button from "../components/common/Button.jsx";
 import { penaltiesAPI } from "../api/penalties";
 
-const MOCK_OVERVIEW = {
-  total: "৳450",
-  paid: "৳200",
-  pending: "৳250",
-};
-
-const MOCK_HISTORY = [
-  {
-    id: 1,
-    type: "Late return penalty",
-    component: "Arduino Uno · BOOK-001",
-    info: "Overdue: 5 days · Date: Dec 20, 2025",
-    status: "Pending",
-    amount: "৳250",
-  },
-  {
-    id: 2,
-    type: "Damage penalty",
-    component: "Ultrasonic Sensor · BOOK-005",
-    info: "Broken connector · Date: Dec 10, 2025",
-    status: "Paid",
-    amount: "৳200",
-  },
-];
-
 const PENALTY_RULES = [
   { label: "Late return", value: "৳50 per day per item" },
   { label: "Minor damage", value: "৳200 – ৳500" },
@@ -39,24 +14,59 @@ const PENALTY_RULES = [
 ];
 
 export default function PenaltiesPage() {
-  const [overview, setOverview] = useState(MOCK_OVERVIEW);
-  const [history, setHistory] = useState(MOCK_HISTORY);
+  const [overview, setOverview] = useState({
+    total: "৳0",
+    paid: "৳0",
+    pending: "৳0",
+  });
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Load penalties via API
   useEffect(() => {
     penaltiesAPI
-      .getPenalties()
-      .then(() => {
-        // When backend is ready, replace with res.data
-        setOverview(MOCK_OVERVIEW);
-        setHistory(MOCK_HISTORY);
+      .getMyPenalties()
+      .then((res) => {
+        const penalties = res.data || [];
+
+        // Calculate overview from penalties
+        let totalAmount = 0;
+        let paidAmount = 0;
+        let pendingAmount = 0;
+
+        penalties.forEach((p) => {
+          const amount = parseFloat(p.amount) || 0;
+          totalAmount += amount;
+          if (p.status === "paid") {
+            paidAmount += amount;
+          } else if (p.status === "pending") {
+            pendingAmount += amount;
+          }
+        });
+
+        setOverview({
+          total: `৳${totalAmount.toFixed(0)}`,
+          paid: `৳${paidAmount.toFixed(0)}`,
+          pending: `৳${pendingAmount.toFixed(0)}`,
+        });
+
+        // Map penalties to history format
+        const historyData = penalties.map((p) => ({
+          id: p.penalty_id,
+          type: p.penalty_type === "overdue" ? "Late Return" : "Damage",
+          component: p.component_name || "Unknown Component",
+          info: p.notes || `Due: ${new Date(p.due_date).toLocaleDateString()}`,
+          amount: `৳${parseFloat(p.amount).toFixed(0)}`,
+          status: p.status?.charAt(0).toUpperCase() + p.status?.slice(1),
+        }));
+
+        setHistory(historyData);
         setLoading(false);
       })
-      .catch(() => {
-        // On error, show mock data
-        setOverview(MOCK_OVERVIEW);
-        setHistory(MOCK_HISTORY);
+      .catch((err) => {
+        console.error("Failed to load penalties:", err);
+        setOverview({ total: "৳0", paid: "৳0", pending: "৳0" });
+        setHistory([]);
         setLoading(false);
       });
   }, []);
@@ -153,8 +163,8 @@ export default function PenaltiesPage() {
               Payment information
             </h3>
             <div className="bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2 mb-3 text-xs text-yellow-900">
-              You have <span className="font-semibold">৳250</span> in pending
-              penalties.
+              You have <span className="font-semibold">{overview.pending}</span>{" "}
+              in pending penalties.
             </div>
             <div className="text-xs text-slate-700 mb-3">
               Payment methods:
@@ -164,18 +174,8 @@ export default function PenaltiesPage() {
                 <li>Nagad: 01XXXXXXXXXX</li>
               </ul>
             </div>
-            <Button
-              className="w-full"
-              onClick={() =>
-                penaltiesAPI.markPaid("all").catch(() => {
-                  console.log("Mark paid clicked");
-                })
-              }
-            >
-              Mark as paid
-            </Button>
             <p className="mt-2 text-[11px] text-slate-500 text-center">
-              Upload receipt to lab admin for verification.
+              Contact lab admin after payment for verification.
             </p>
           </Card>
 

@@ -1,9 +1,13 @@
+import { useState, useEffect } from "react";
+import { authAPI } from "../../api/auth";
+
 export default function AuthNavbar({ title = "Dashboard" }) {
-  const student = {
-    name: "Tamvir Hossan",
-    id: "01122xxxx",
-    dept: "Dept: CSE",
-  };
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const currentUser = authAPI.getCurrentUser();
+    setUser(currentUser);
+  }, []);
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
@@ -11,9 +15,11 @@ export default function AuthNavbar({ title = "Dashboard" }) {
 
       <div className="flex items-center gap-4">
         <div className="text-right text-xs md:text-sm">
-          <div className="font-semibold text-slate-900">{student.name}</div>
+          <div className="font-semibold text-slate-900">
+            {user?.full_name || "Student"}
+          </div>
           <div className="text-slate-500">
-            ID: {student.id} · {student.dept}
+            ID: {user?.id || "N/A"} · {user?.department || "N/A"}
           </div>
         </div>
         <div className="px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-[11px] font-semibold flex items-center gap-1">

@@ -1,17 +1,40 @@
 import { useState } from "react";
 import Button from "../common/Button.jsx";
+import { authAPI } from "../../api/auth";
 
 export default function LoginModal({ open, onClose }) {
-  const [userType, setUserType] = useState("student"); // or "admin"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   if (!open) return null;
 
-  const handleLogin = () => {
-    // Later: actually authenticate
-    if (userType === "student") {
-      window.location.href = "/dashboard";
-    } else {
-      window.location.href = "/admin/dashboard";
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await authAPI.login(email, password);
+      const { token, user } = response.data;
+
+      // Store token and user info
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // Redirect based on role (determined by backend)
+      if (user.role === "admin") {
+        window.location.href = "/admin/dashboard";
+      } else {
+        window.location.href = "/dashboard";
+      }
+    } catch (err) {
+      console.error("Login failed:", err);
+      setError(
+        err.response?.data?.message || "Login failed. Please try again.",
+      );
+      setLoading(false);
     }
   };
 
@@ -25,39 +48,21 @@ export default function LoginModal({ open, onClose }) {
           </button>
         </div>
 
-        {/* Toggle: Student / Admin */}
-        <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-full">
-          <button
-            onClick={() => setUserType("student")}
-            className={`flex-1 py-2 rounded-full text-sm font-semibold transition-all ${
-              userType === "student"
-                ? "bg-primary-500 text-white"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Student
-          </button>
-          <button
-            onClick={() => setUserType("admin")}
-            className={`flex-1 py-2 rounded-full text-sm font-semibold transition-all ${
-              userType === "admin"
-                ? "bg-primary-500 text-white"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Admin
-          </button>
-        </div>
-
-        <div className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4">
+          {error && (
+            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm text-slate-700 mb-1">Email</label>
             <input
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
               className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
-              placeholder={
-                userType === "student" ? "student@uiu.ac.bd" : "admin@uiu.ac.bd"
-              }
+              placeholder="your.email@uiu.ac.bd"
             />
           </div>
           <div>
@@ -66,21 +71,23 @@ export default function LoginModal({ open, onClose }) {
             </label>
             <input
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
               className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary-500"
               placeholder="••••••••"
             />
           </div>
 
           <div className="text-xs text-slate-600 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-            {userType === "student"
-              ? "Login with your student email and password"
-              : "Login with your admin credentials"}
+            Login with your university credentials. You will be redirected based
+            on your account type.
           </div>
 
-          <Button className="w-full" onClick={handleLogin}>
-            {userType === "student" ? "Student Login" : "Admin Login"}
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );

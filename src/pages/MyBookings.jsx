@@ -6,81 +6,73 @@ import Badge from "../components/common/Badge.jsx";
 import Button from "../components/common/Button.jsx";
 import { bookingsAPI } from "../api/bookings";
 
-const MOCK_BOOKINGS = [
-  {
-    id: "BOOK-001",
-    component: "Arduino Uno",
-    qty: 1,
-    requested: "2025-12-26",
-    expected: "2025-12-30",
-    status: "Approved",
-    penalty: "৳0",
-  },
-  {
-    id: "BOOK-002",
-    component: "Ultrasonic Sensor",
-    qty: 2,
-    requested: "2025-12-20",
-    expected: "2025-12-25",
-    status: "Returned",
-    penalty: "৳0",
-  },
-  {
-    id: "BOOK-003",
-    component: "ESP32 Dev Kit",
-    qty: 1,
-    requested: "2025-12-27",
-    expected: "2026-01-03",
-    status: "Requested",
-    penalty: "৳0",
-  },
-];
-
-const STATUS_FILTERS = ["All", "Active", "Completed", "Overdue"];
-
-function statusMatchesFilter(booking, filter) {
-  if (filter === "All") return true;
-  if (filter === "Active")
-    return booking.status === "Approved" || booking.status === "Requested";
-  if (filter === "Completed") return booking.status === "Returned";
-  if (filter === "Overdue") return booking.status === "Overdue";
-  return true;
-}
+const STATUS_FILTERS = ["All", "Requested", "Approved", "Returned", "Rejected"];
 
 function badgeVariant(status) {
-  if (status === "Approved") return "success";
-  if (status === "Requested") return "warning";
-  if (status === "Returned") return "default";
-  if (status === "Overdue") return "error";
+  const s = status?.toLowerCase();
+  if (s === "approved") return "success";
+  if (s === "requested") return "warning";
+  if (s === "returned") return "default";
+  if (s === "rejected") return "error";
   return "default";
 }
 
 export default function MyBookings() {
   const [filter, setFilter] = useState("All");
-  const [bookings, setBookings] = useState(MOCK_BOOKINGS);
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Load bookings via API
   useEffect(() => {
-    const filterParam = filter === "All" ? "all" : filter.toLowerCase();
-
     bookingsAPI
-      .getBookings(filterParam)
-      .then(() => {
-        // When backend is ready, replace with res.data
-        setBookings(
-          MOCK_BOOKINGS.filter((b) => statusMatchesFilter(b, filter))
-        );
+      .getMyBookings()
+      .then((res) => {
+        // Map backend response to frontend format
+        const mapped = (res.data || []).map((b) => ({
+          id: b.booking_id,
+          displayId: `BOOK-${String(b.booking_id).padStart(3, "0")}`,
+          component: b.component_name || `Component #${b.components_id}`,
+          qty: b.quantity,
+          requested: b.requested_date?.split("T")[0],
+          expected: b.expected_return_date?.split("T")[0],
+          status: b.status?.charAt(0).toUpperCase() + b.status?.slice(1),
+          isOverdue: b.is_overdue,
+        }));
+        setBookings(mapped);
         setLoading(false);
       })
-      .catch(() => {
-        // On error, show mock data
-        setBookings(
-          MOCK_BOOKINGS.filter((b) => statusMatchesFilter(b, filter))
-        );
+      .catch((err) => {
+        console.error("Failed to load bookings:", err);
+        setBookings([]);
         setLoading(false);
       });
-  }, [filter]);
+  }, []);
+
+  // Filter bookings based on selected filter
+  const filteredBookings = bookings.filter((b) => {
+    if (filter === "All") return true;
+    return b.status?.toLowerCase() === filter.toLowerCase();
+  });
+
+  const handleReturn = (bookingId) => {
+    bookingsAPI
+      .returnBooking(bookingId)
+      .then(() => {
+        // Update local state
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === bookingId ? { ...b, status: "Returned" } : b,
+          ),
+        );
+        alert("Booking marked as returned!");
+      })
+      .catch((err) => {
+        console.error("Failed to return booking:", err);
+        alert(
+          "Failed to return booking. " + (err.response?.data?.message || ""),
+        );
+      });
+  };
 
   if (loading) {
     return (
@@ -138,16 +130,16 @@ export default function MyBookings() {
                 <th className="py-2 pr-3">Requested</th>
                 <th className="py-2 pr-3">Expected return</th>
                 <th className="py-2 pr-3">Status</th>
-                <th className="py-2">Penalty</th>
+                <th className="py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {bookings.map((b) => (
+              {filteredBookings.map((b) => (
                 <tr
                   key={b.id}
                   className="border-b border-slate-100 last:border-0"
                 >
-                  <td className="py-2 pr-3">{b.id}</td>
+                  <td className="py-2 pr-3">{b.displayId}</td>
                   <td className="py-2 pr-3">{b.component}</td>
                   <td className="py-2 pr-3">{b.qty}</td>
                   <td className="py-2 pr-3">
@@ -157,12 +149,25 @@ export default function MyBookings() {
                     {new Date(b.expected).toLocaleDateString()}
                   </td>
                   <td className="py-2 pr-3">
-                    <Badge variant={badgeVariant(b.status)}>{b.status}</Badge>
+                    <Badge
+                      variant={b.isOverdue ? "error" : badgeVariant(b.status)}
+                    >
+                      {b.isOverdue ? "Overdue" : b.status}
+                    </Badge>
                   </td>
-                  <td className="py-2">{b.penalty}</td>
+                  <td className="py-2">
+                    {b.status === "Approved" && (
+                      <button
+                        onClick={() => handleReturn(b.id)}
+                        className="px-2 py-1 bg-emerald-500 text-white text-xs rounded font-semibold hover:bg-emerald-600"
+                      >
+                        Return
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
-              {bookings.length === 0 && (
+              {filteredBookings.length === 0 && (
                 <tr>
                   <td className="py-4 text-center text-slate-500" colSpan={7}>
                     No bookings in this category.
